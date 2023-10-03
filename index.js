@@ -1,10 +1,10 @@
 const express = require('express');
 const multer = require('multer');
 const AWS = require('aws-sdk');
-const fs = require('fs');
-const path = require('path');
+const cors = require('cors');
 
 const app = express();
+app.use(cors());
 const port = process.env.PORT || 3000;
 
 // Configure AWS SDK with your credentials
