@@ -62,6 +62,8 @@ app.post('/upload', upload.single('file'), (req, res) => {
 app.post("/otp/send", async (req, res) => {
     try {
         const {recipient} = req.body;
+        console.log(recipient);
+        console.log(appendCountryCode(`${recipient}`));
         const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
 
         const OTP = generateOTP(6);
