@@ -4,9 +4,12 @@ const multer = require('multer');
 const AWS = require('aws-sdk');
 const cors = require('cors');
 const {axios} = require("./lib/axios")
+const bodyParser = require('body-parser')
 
 const app = express();
 app.use(cors());
+app.use(bodyParser.json());
+
 const port = process.env.PORT || 3000;
 
 // Configure AWS SDK with your credentials
@@ -29,6 +32,18 @@ const appendCountryCode = (phno, cc = "+91") => {
     }
 
     return `${cc}${phno}`
+}
+
+function generateOTP(length) {
+    const charset = '0123456789'; // You can customize this to include letters and special characters if needed
+    let otp = '';
+
+    for (let i = 0; i < length; i++) {
+        const randomIndex = Math.floor(Math.random() * charset.length);
+        otp += charset[randomIndex];
+    }
+
+    return otp;
 }
 
 
