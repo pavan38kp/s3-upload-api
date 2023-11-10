@@ -1,7 +1,9 @@
+require("dotenv").config();
 const express = require('express');
 const multer = require('multer');
 const AWS = require('aws-sdk');
 const cors = require('cors');
+const {axios} = require("./lib/axios")
 
 const app = express();
 app.use(cors());
@@ -20,6 +22,15 @@ const s3 = new AWS.S3();
 // Multer middleware for file upload
 const storage = multer.memoryStorage();
 const upload = multer({ storage });
+
+const appendCountryCode = (phno, cc = "+91") => {
+    if (phno.startsWith('+')) {
+        return phno
+    }
+
+    return `${cc}${phno}`
+}
+
 
 // Define a route for file upload
 app.post('/upload', upload.single('file'), (req, res) => {
@@ -46,6 +57,94 @@ app.post('/upload', upload.single('file'), (req, res) => {
         res.json({ message: 'File uploaded to S3', fileUrl: data.Location });
     });
 });
+
+
+app.post("/otp/send", async (req, res) => {
+    try {
+        const {recipient} = req.body;
+        const client = twilio(process.env.TWILIO_ACCOUNT_SID, process.env.TWILIO_AUTH_TOKEN);
+
+        const OTP = generateOTP(6);
+
+        await axios({
+            method: "POST",
+            url: "/api/rest/admin/otp/add",
+            data: {
+                v: OTP
+            }
+        })
+
+        const response = await client.messages.create({
+            from: process.env.TWILIO_PHONE_NUMBER,
+            to: appendCountryCode(`${recipient}`),
+            body: req.query?.auth === "true" ? `Your OTP from Housezy is ${OTP}` : `Your OTP to acknowledge Housezy service completion is ${OTP}`
+        })
+
+        return res.json({
+            status: 200,
+            body: {
+                message: 'OTP sent successfully',
+                data: response.sid
+            }
+        })
+    } catch (err) {
+        return res.json({
+            status: 500,
+            errro: err
+        })
+    }
+})
+
+
+app.post("/otp/verify", async (req, res) => {
+    try {
+        const {otp} = req.body;
+        const otpRecord = await axios.post("/api/rest/admin/otp", {otp})
+
+        if (otpRecord.data.otp.length === 0) {
+            return res.json({
+                body: {
+                    message: 'Invalid OTP',
+                }
+            }, {
+                status: 400
+            })
+        }
+
+        const OTP = otpRecord.data.otp[0]
+
+        if (OTP.created_at + 5 * 60 * 1000 < Date.now()) {
+            return res.json({
+                body: {
+                    message: 'OTP expired',
+                }
+            }, {
+                status: 400,
+            })
+        }
+
+        await axios({
+            method: "DELETE",
+            url: "/api/rest/admin/otp/blacklist",
+            data: {
+                id: OTP.id
+            }
+        })
+
+        return res.json({
+            status: 200,
+            body: {
+                message: 'OTP verified successfully',
+                data: ''
+            }
+        })
+    } catch (err) {
+        return res.json({
+            status: 500,
+            errro: err
+        })
+    }
+})
 
 app.listen(port, () => {
     console.log(`Server is running on port ${port}`);
